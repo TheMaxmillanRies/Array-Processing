@@ -1,7 +1,8 @@
 [X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
 
-temp = X(1,:);
-plot(real(temp),imag(temp),'*r')
+Singular = svd(X);
+
+plot(Singular,'*r')
 
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
