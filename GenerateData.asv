@@ -1,8 +1,8 @@
-[X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 1000);
+[X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
 
 Singular = svd(X);
 
-%plot(Singular,'*r')
+plot(Singular,'*r')
 
 theta = esprit_direction(X, 2);
 
@@ -42,17 +42,13 @@ function theta = esprit_direction(X, d)
     X_bottom = X(2:size(X,1), :);
     
     Z = [X_top; X_bottom];
-        
-    [U,S,V] = svd(Z,"econ");
     
-    Ux = U(1:size(U,1)/2, :);
-    Uy = U(size(U,1)/2+1:size(U,1), :);
+    [U,S,V] = svd(Z);
     
-    pUx = pinv(Ux);
-    pUxUy = pUx * Uy;
+    disp(size(X));
+    disp(size(Z));
+    di
 
-    [Vectors,Values] = eig(pUxUy);
-    
     theta = 0;
     
 end
