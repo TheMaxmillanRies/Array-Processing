@@ -45,6 +45,14 @@ function theta = esprit_direction(X, d)
         
     [U,S,V] = svd(Z,"econ");
     
+    for i = size(S,1):-1:1
+        if S(i,i) < 0.00005
+            U(:,i) = [];
+            S(i,:) = [];
+            S(:,i) = [];
+        end
+    end
+    
     Ux = U(1:size(U,1)/2, :);
     Uy = U(size(U,1)/2+1:size(U,1), :);
     
@@ -53,6 +61,9 @@ function theta = esprit_direction(X, d)
 
     [Vectors,Values] = eig(pUxUy);
     
-    theta = 0;
+    theta = zeros(size(Values,1),1);
     
+    for i = 1:size(Values,1)
+        theta(i) = 180/pi*asin(acos(real(Values(i,i)))/pi);
+    end
 end
