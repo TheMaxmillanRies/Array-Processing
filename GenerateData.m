@@ -8,6 +8,8 @@ theta = esprit(X, 2);
 
 f = espritfreq(X, 2);
 
+theta, f = joint(X, 2, 10);
+
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
     X = zeros(M, N);
@@ -71,10 +73,7 @@ function theta = esprit(X, d)
     theta = zeros(size(Values,1),1);
     
     for i = 1:size(Values,1)
-        theta(i) = 180/pi*asin(acos(real(Values(i,i)))/pi);
-        if imag(Values(i,i)) < 0
-            theta(i) = theta(i) * -1;
-        end
+        theta(i) = 180/pi*asin(angle(Values(i,i))/pi);
     end
 end
 
@@ -97,9 +96,6 @@ function f = espritfreq(X, d)
 
     Ux = U(1:size(U,1) - 1, :);
     Uy = U(2:size(U,1), :);
-
-    %Ux = U(1:size(U,1)/2, :);
-    %Uy = U(size(U,1)/2+1:size(U,1), :);
     
     pUx = pinv(Ux);
     pUxUy = pUx * Uy;
@@ -109,15 +105,66 @@ function f = espritfreq(X, d)
     f = zeros(size(Values,1),1);
 
     for i = 1:size(Values,1)
-        f(i) = acos(real(Values(i,i))) / (2*pi);
-        if imag(Values(i,i)) < 0
-            f(i) = f(i) * -1;
-        end
+        f(i) = angle(Values(i,i)) / (2*pi);
     end
 end
 
+% Joint works but, but I calculate freq and angle separately, normally stop
+% at the pseudoinverse multiplication and do the joint solver.
 function [theta, f] = joint(X, d, m)
+    N = size(X, 2);
     
-
+    Z = zeros(m*size(X, 1), N-m);
+    
+    for j = 1:N-m
+        counter = 0;
+        for i = 1:size(X, 1):m*size(X, 1)
+            Z(i:i+size(X, 1)-1,j) = X(:,j+counter);
+            counter = counter + 1;
+        end
+    end
+    
+   
+    [U,S,V] = svd(Z,"econ");
+    
+    S = S(1:d,1:d);
+    U = U(:,1:d);
+    
+    deltaX = [eye(size(X,1)) zeros(size(X,1),1)];
+    deltaY = [zeros(size(X,1),1) eye(size(X,1))];
+    
+    tempX = transpose(kron(eye(m), deltaX));
+    tempY = transpose(kron(eye(m), deltaY));
+    
+    Ux = tempX * U;
+    Uy = tempY * U;
+    
+    pUx = pinv(Ux);
+    pUxUy = pUx * Uy;
+    
+    [Vectors,Values] = eig(pUxUy);
+    
+    theta = zeros(size(Values,1),1);
+    
+    for i = 1:size(Values,1)
+        theta(i) = 180/pi*asin(angle(Values(i,i))/pi);
+    end
+    
+    deltaX = transpose(kron([eye(m) zeros(m,1)], eye(size(X,1))));
+    deltaY = transpose(kron([zeros(m,1) eye(m)], eye(size(X,1))));
+    
+    Ux = deltaX * U;
+    Uy = deltaY * U;
+    
+    pUx = pinv(Ux);
+    pUxUy = pUx * Uy;
+    
+    [Vectors,Values] = eig(pUxUy);
+    
+    f = zeros(size(Values,1),1);
+    
+    for i = 1:size(Values,1)
+        f(i) = angle(Values(i,i)) / (2*pi);
+    end
 end
 
