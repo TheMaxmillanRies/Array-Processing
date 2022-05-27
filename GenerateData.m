@@ -8,7 +8,9 @@ theta = esprit(X, 2);
 
 f = espritfreq(X, 2);
 
-theta, f = joint(X, 2, 10);
+%theta, f = joint(X, 2, 10);
+
+
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
@@ -140,15 +142,13 @@ function [theta, f] = joint(X, d, m)
     Uy = tempY * U;
     
     pUx = pinv(Ux);
-    pUxUy = pUx * Uy;
+    pUxUy_theta = pUx * Uy;
     
-    [Vectors,Values] = eig(pUxUy);
-    
-    theta = zeros(size(Values,1),1);
-    
-    for i = 1:size(Values,1)
-        theta(i) = 180/pi*asin(angle(Values(i,i))/pi);
-    end
+    %[Vectors,Values] = eig(pUxUy);
+    %theta = zeros(size(Values,1),1);
+    %for i = 1:size(Values,1)
+    %    theta(i) = 180/pi*asin(angle(Values(i,i))/pi);
+    %end
     
     deltaX = transpose(kron([eye(m) zeros(m,1)], eye(size(X,1))));
     deltaY = transpose(kron([zeros(m,1) eye(m)], eye(size(X,1))));
@@ -157,14 +157,16 @@ function [theta, f] = joint(X, d, m)
     Uy = deltaY * U;
     
     pUx = pinv(Ux);
-    pUxUy = pUx * Uy;
-    
-    [Vectors,Values] = eig(pUxUy);
-    
-    f = zeros(size(Values,1),1);
-    
-    for i = 1:size(Values,1)
-        f(i) = angle(Values(i,i)) / (2*pi);
-    end
-end
+    pUxUy_f = pUx * Uy;
 
+    MM = zeros(2,2,2);
+    MM(:,:,1) = pUxUy_theta;
+    MM(:,:,2) = pUxUy_f;
+    [A,LL,Cost] = acdc(MM);
+    x = 0;
+%     [Vectors,Values] = eig(pUxUy);
+%     f = zeros(size(Values,1),1);
+%     for i = 1:size(Values,1)
+%         f(i) = angle(Values(i,i)) / (2*pi);
+%     end
+end

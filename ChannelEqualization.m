@@ -1,17 +1,35 @@
 
 temp = 1/sqrt(2) + 1i*1/sqrt(2);
-s = [temp, temp, temp, temp];
+s = zeros(500, 1);
+for i = 1:500
+    s(i) = temp;
+end
 
-x = gendata_conv(s, 1, 4, 0.5);
+x = gendata_conv(s, 4, 500, 0.5);
 
 function x = gendata_conv(s, P, N, sigma)
-    x = zeros(1, N);
-    
-    for i = 0:N-1
-        for j = 1:size(s,2)
-            x(i+1) = x(i+1) + getH(i-j) * s(j) + normrnd(0,sigma) + 1i*normrnd(0,sigma);
+    x = zeros(2*P, N);
+
+    for i = 1:2*P
+        for j = 1:N
+            x(i,j) = sigma.*rand(1, 1) + 1i*sigma.*rand(1,1);
         end
     end
+    w = x;
+
+    for i = 1:2*P
+        for j = 1:N
+            h = zeros(N,1);
+            for k  = 1:N
+                h(j) = getH((j-1) - (k-1) + (i-1)/P);
+            end
+
+            conv_res = conv(s, h, 'valid');
+            x(i,j) = x(i,j) + conv_res;
+        end
+    end
+
+    del = 0;
 end
 
 function h = getH(t)
@@ -27,6 +45,3 @@ function h = getH(t)
         h = 0;
     end
 end
-
-k + n/p
-n = 0 -> p-1
