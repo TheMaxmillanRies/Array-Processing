@@ -1,3 +1,4 @@
+clc; clear all
 [X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 100000000);
 
 Singular = svd(X);
@@ -10,7 +11,38 @@ f = espritfreq(X, 2);
 
 %theta, f = joint(X, 2, 10);
 
+%% Comparision
+d = 2; M = 3; N = 20; theta = [-20, 30]; f = [0.1, 0.12];
+SNR = 0:4:20; test_num = 1000;
+theta1 = zeros(d, size(SNR,2),test_num);
+f2 = zeros(d, size(SNR,2),test_num);
+theta3 = zeros(d, size(SNR,2),test_num);
+f3 = zeros(d, size(SNR,2),test_num);
 
+for i=1:size(SNR,2)
+    for j=1:test_num
+        snr = SNR(i);
+        [X, A, S] = gendata(M, N, 0.5, theta, f, snr);
+
+        theta1(:,i,j) = esprit(X, 2);
+        f2(:,i,j) = espritfreq(X, 2);
+%         [theta3(:,i,j), f3(:,i,j)] = joint(X, 2, 10);
+    end
+
+    % Mean
+    theta1_mean = mean(theta1,3);
+    f2_mean = mean(f2,3);
+%     theta3_mean = mean(theta3,3);
+%     f3_mean = mean(f3,3);
+
+    % Variance
+    theta1_std = std(theta1,0,3);
+    f2_std = std(f2,0,3);
+%     theta3_std = std(theta3,0,3);
+%     f3_std = std(f3,0,3);
+end
+
+%% Functions
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
