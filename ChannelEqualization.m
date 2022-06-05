@@ -5,7 +5,7 @@ for i = 1:500
     s(i) = temp;
 end
 
-x = gendata_conv(s, 4, 500, 0.5);
+x = gendata_conv(s, 4, 500, 0);
 
 function x = gendata_conv(s, P, N, sigma)
     x = zeros(2*P, N);
@@ -45,3 +45,7 @@ function h = getH(t)
         h = 0;
     end
 end
+
+
+
+

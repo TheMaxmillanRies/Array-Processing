@@ -1,4 +1,4 @@
-[X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 100000000);
+[X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 10);
 
 Singular = svd(X);
 
@@ -11,6 +11,54 @@ f = espritfreq(X, 2);
 %theta, f = joint(X, 2, 10);
 
 
+
+esp_theta = zeros(2, 6);
+esp_f = zeros(2, 6);
+% Add joint
+
+for snr = 0:4:20
+    esprit_theta = zeros(2, 1000);
+    esprit_f = zeros(2, 1000);
+    joint_arr = zeros(2, 1000);
+
+    for i = 1:1000
+        [X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], snr);
+        theta = esprit(X, 2);
+        esprit_theta(1,i) = theta(1);
+        esprit_theta(2,i) = theta(2);
+
+        f = espritfreq(X, 2);
+        esprit_f(1,i) = f(1);
+        esprit_f(2,i) = f(2);
+
+        % Add joint output
+
+    end
+    
+    esp_theta(:,snr/4+1) = mean(esprit_theta, 2); % TODO: fix sign on the values
+    esp_f(:,snr/4+1) = mean(esprit_f, 2);
+    % Add joint mean
+       
+end
+
+f1 = figure;
+hold on
+plot((0:4:20), esp_theta(1,:),'r.');
+plot((0:4:20), esp_theta(2,:),'ro');
+% Add joint
+hold off
+
+f2 = figure;
+hold on
+plot((0:4:20), esp_f(1,:),'g.');
+plot((0:4:20), esp_f(2,:),'go');
+% Add joint
+hold off
+
+[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
+[S_f, w_H_f] = zero_forcing_freq(X, f);
+
+%plot_spatial_response_f(w_H_theta, 0.5); %TODO: Add magnitude
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
@@ -170,3 +218,104 @@ function [theta, f] = joint(X, d, m)
 %         f(i) = angle(Values(i,i)) / (2*pi);
 %     end
 end
+
+function [S_estimate, w_H] = zero_forcing_theta(X, Delta, theta)
+    M = size(X, 1);
+    num_sources = size(theta,1);
+
+    A = zeros(M, num_sources);
+    for i = 0:M-1
+        for j = 1:num_sources
+            A(i+1,j) = exp(1i*2*pi*i*Delta*sind(theta(j)));
+        end
+    end
+
+    tempa = A';
+    tempb = A' * A;
+    tempc = eye(num_sources)/tempb;
+
+    w_H = tempc * tempa;
+
+    S_estimate = w_H * X;
+end
+
+function [S_estimate, w_H] = zero_forcing_freq(X, f)
+    num_sources = size(f, 1);
+    num_samples = size(X, 2);
+
+    S = zeros(num_sources, num_samples);
+    for i = 1:num_sources
+        for j = 1:num_samples
+            S(i,j) = exp(1i*2*pi*f(i)*j);
+        end
+    end
+
+    tempa = S';
+    tempb = S*tempa;
+    tempc = eye(num_sources) / tempb;
+    A = (X * tempa) * tempc;
+    
+    tempa = A';
+    tempb = A' * A;
+    tempc = eye(num_sources)/tempb;
+
+    w_H = tempc * tempa;
+    S_estimate = w_H * X;
+end
+
+function spatial_responses = plot_spatial_response_theta(w_H, Delta)
+    M = size(w_H, 2);
+    num_sources = size(w_H, 1);
+
+    y = zeros(2,180);
+
+    for angle = -90:90
+        A = zeros(M, num_sources);
+        for i = 0:M-1
+            for j = 1:num_sources
+                A(i+1,j) = exp(1i*2*pi*i*Delta*sind(angle));
+            end
+        end
+        temp = w_H * A;
+        y(1,angle+91) = temp(1,1);
+        y(2,angle+91) = temp(2,1);
+    end
+
+    x_axis = (-90:90);
+    f1 = figure;
+    plot(x_axis, y(1,:));
+
+    f2 = figure;
+    plot(x_axis, y(2,:));
+end
+
+function spatial_responses = plot_spatial_response_f(w_H, Delta)
+    M = size(w_H, 2);
+    num_sources = size(w_H, 1);
+
+    y = zeros(2,180);
+
+    for angle = -90:90
+        A = zeros(M, num_sources);
+        for i = 0:M-1
+            for j = 1:num_sources
+                A(i+1,j) = exp(1i*2*pi*i*Delta*sind(angle));
+            end
+        end
+        temp = w_H * A;
+        y(1,angle+91) = temp(1,1);
+        y(2,angle+91) = temp(2,1);
+    end
+
+    x_axis = (-90:90);
+    f1 = figure;
+    plot(x_axis, y(1,:));
+
+    f2 = figure;
+    plot(x_axis, y(2,:));
+end
+
+
+
+
+
