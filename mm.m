@@ -63,17 +63,36 @@ X = stft(microphone_data, fs, 'Window', win,'OverlapLength',0.5*nfft);
 %% Estimate ATF
 noise_only = microphone_data(1:8000,:); % only one reference microphone or all microphones?
 N = stft(noise_only, fs, 'Window', win,'OverlapLength',0.5*nfft);
-% Rn = noise_only*noise_only';
-% 
-for i = 1:size(N,1)
-    for j = 1:size(N,2)
-        Rn = squeeze(N(i,j,:)) * squeeze(N(i,j,:))';
-        [Vectors,Values] = eig(Rn);
-        pre_whiten = Values^(-0.5) * Vectors';
+t_repeat = ceil(size(X,2)/size(N,2));
+N_rm = repmat(N,1,t_repeat,1);
+
+for i = 1:size(X,1)
+    for j = 1:size(X,2)
+        Rn = squeeze(N_rm(i,j,:)) * squeeze(N_rm(i,j,:))';
+%         [Vectors,Values] = eig(Rn);
+        pre_whiten = Rn^(-1/2);
         I = pre_whiten * Rn * pre_whiten;
+        X_pw = pre_whiten * squeeze(X(i,j,:));
+        Rx_pw = X_pw * X_pw';
+        [V,D] = eig(Rx_pw);
+        [d,ind] = sort(diag(D),'descend');
+        Ds = D(ind,ind);
+        Vs = V(:,ind);
+        a(i,j,:) = Vs(:,1);
     end
 end
 
 % pre_whiten = sqrtm(Rn);
 noise_whiten = pre_whiten * noise_only;
 Rn_w = noise_whiten * noise_whiten';
+
+% for i = 1:size(X,1)
+%     for j = 1:size(X,2)
+%         Rx = squeeze(X(i,j,:)) * squeeze(X(i,j,:))';
+%         [U,V,Q] = eig(Rx);
+%         if j == 2000
+%             print(j);
+%         end
+%        
+%     end
+% end
