@@ -58,7 +58,6 @@ end
 window_length = 400;
 hop_size = window_length / 2;
 window = hamming(window_length).';
-new_data = [];
 
 % FFT of IR
 a = zeros(4,800);
@@ -75,7 +74,7 @@ end
 new_data = zeros(1, size(microphone_data,2)); % x
 for i = 1:hop_size:size(microphone_data,2)
         segment = [];
-        if i + window_length > size(microphone_data,2)
+        if i + window_length*2 > size(microphone_data,2)
               continue;
         else
             segment = zeros(4, window_length);
@@ -102,14 +101,12 @@ for i = 1:hop_size:size(microphone_data,2)
 
             temp = (tempa' * tempa);
             wH = tempa' ./ temp;
-            %a_p = pinv(tempa);
             source(k) = wH * tempseg;            
         end
 
         ifft_source = ifft(source);
-        ifft_source = ifft_source(1:size(window_length));
 
-        new_data(i:i+size(segment,2) - 1) = new_data(i:i+size(segment,2) - 1) + ifft_source;
+        new_data(i:i+size(ifft_source,2) - 1) = new_data(i:i+size(ifft_source,2) - 1) + ifft_source;
         %new_data(1, i:i+size(segment,2) - 1) = new_data(1, i:i+size(segment,2) - 1) + segment(1,:);
         %new_data(2, i:i+size(segment,2) - 1) = new_data(2, i:i+size(segment,2) - 1) + segment(2,:);
         %new_data(3, i:i+size(segment,2) - 1) = new_data(3, i:i+size(segment,2) - 1) + segment(3,:);
