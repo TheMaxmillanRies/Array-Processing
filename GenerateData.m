@@ -1,4 +1,4 @@
-[X, A, S] = gendata(5, 20, 0.5, [-20, 30], [0.1, 0.3], 10);
+[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
 
 Singular = svd(X);
 
@@ -9,8 +9,6 @@ theta = esprit(X, 2);
 f = espritfreq(X, 2);
 
 %theta, f = joint(X, 2, 10);
-
-
 
 esp_theta = zeros(2, 6);
 esp_f = zeros(2, 6);
@@ -24,8 +22,14 @@ for snr = 0:4:20
     for i = 1:1000
         [X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], snr);
         theta = esprit(X, 2);
-        esprit_theta(1,i) = theta(1);
-        esprit_theta(2,i) = theta(2);
+        if theta(1) < 0
+            esprit_theta(1,i) = theta(1);
+            esprit_theta(2,i) = theta(2);
+        else
+            esprit_theta(1,i) = theta(2);
+            esprit_theta(2,i) = theta(1);
+        end
+
 
         f = espritfreq(X, 2);
         esprit_f(1,i) = f(1);
@@ -35,6 +39,7 @@ for snr = 0:4:20
 
     end
     
+
     esp_theta(:,snr/4+1) = mean(esprit_theta, 2); % TODO: fix sign on the values
     esp_f(:,snr/4+1) = mean(esprit_f, 2);
     % Add joint mean
@@ -99,7 +104,6 @@ function theta = esprit(X, d)
         
     [U,S,V] = svd(Z,"econ");
 
-    S = S(1:d,1:d);
     U = U(:,1:d);
     
     %Instead of this for loop to cut down small values, I think d needs to
@@ -141,7 +145,6 @@ function f = espritfreq(X, d)
 
     [U,S,V] = svd(Z,"econ");
 
-    S = S(1:d,1:d);
     U = U(:,1:d);
 
     Ux = U(1:size(U,1) - 1, :);
@@ -173,11 +176,9 @@ function [theta, f] = joint(X, d, m)
             counter = counter + 1;
         end
     end
-    
    
     [U,S,V] = svd(Z,"econ");
     
-    S = S(1:d,1:d);
     U = U(:,1:d);
     
     deltaX = [eye(size(X,1)) zeros(size(X,1),1)];
@@ -211,7 +212,7 @@ function [theta, f] = joint(X, d, m)
     MM(:,:,1) = pUxUy_theta;
     MM(:,:,2) = pUxUy_f;
     [A,LL,Cost] = acdc(MM);
-    x = 0;
+
 %     [Vectors,Values] = eig(pUxUy);
 %     f = zeros(size(Values,1),1);
 %     for i = 1:size(Values,1)

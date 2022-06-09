@@ -69,26 +69,13 @@ end
 norm = a(1,:);
 % Make relative IR
 for j = 1:4
-    a(j,:) = a(j,:) / norm;
+    a(j,:) = a(j,:) ./ norm;
 end
 
-% Create windows and process in STFT space
-test1 = zeros(4, size(microphone_data,2));
-test2 = zeros(4, size(microphone_data,2));
-
-new_data = zeros(4, size(microphone_data,2)); % x
+new_data = zeros(1, size(microphone_data,2)); % x
 for i = 1:hop_size:size(microphone_data,2)
         segment = [];
-        % Final window is incomplete due to size % window_length != 0 but
-        % doesn't matter since it's mostly 0's due to padding being used
         if i + window_length > size(microphone_data,2)
-%             segment = zeros(4, size(microphone_data,2) - i);
-%             segment(1,1:window_length) = microphone_data(1,i:size(microphone_data,2) - 1);
-%             segment(2,1:window_length) = microphone_data(2,i:size(microphone_data,2) - 1);
-%             segment(3,1:window_length) = microphone_data(3,i:size(microphone_data,2) - 1);
-%             segment(4,1:window_length) = microphone_data(4,i:size(microphone_data,2) - 1);
-% 
-%             window = window(1:size(segment,2));
               continue;
         else
             segment = zeros(4, window_length);
@@ -103,36 +90,35 @@ for i = 1:hop_size:size(microphone_data,2)
         segment(3,:) = segment(3,:) .* window;
         segment(4,:) = segment(4,:) .* window;
 
-%         fft_seg = zeros(4, 800);
-%         for j = 1:4
-%             fft_seg(j,:) = fft(segment(j,:), 800);
-%         end 
-% 
-%         a_p = pinv(a);
-%         fft_s_estimate = a_p.' .* fft_seg;
-%         ifft_s_estimate = ifft(fft_s_estimate);
-%         ifft_s_estimate = ifft_s_estimate(:,1:400);
-% 
-%         w = (1/4)*a.';
-%         fft_s_estimate2 = w.' .* fft_seg;
-%         ifft_s_estimate2 = ifft(fft_s_estimate2);
-%         ifft_s_estimate2 = ifft_s_estimate2(:,1:400);
-%         
-%         test1(:, i:i+size(ifft_s_estimate,2) - 1) = test1(:, i:i+size(segment,2) - 1) + ifft_s_estimate;
-%         test2(:, i:i+size(ifft_s_estimate2,2) - 1) = test2(:, i:i+size(segment,2) - 1) + ifft_s_estimate2;
+        fft_seg = zeros(4, 800);
+        for j = 1:4
+            fft_seg(j,:) = fft(segment(j,:), 800);
+        end 
 
+        source = zeros(1, window_length);
+        for k = 1:size(fft_seg,2)
+            tempa = a(:,k);
+            tempseg = fft_seg(:,k);
 
-        new_data(1, i:i+size(segment,2) - 1) = new_data(1, i:i+size(segment,2) - 1) + segment(1,:);
-        new_data(2, i:i+size(segment,2) - 1) = new_data(2, i:i+size(segment,2) - 1) + segment(2,:);
-        new_data(3, i:i+size(segment,2) - 1) = new_data(3, i:i+size(segment,2) - 1) + segment(3,:);
-        new_data(4, i:i+size(segment,2) - 1) = new_data(4, i:i+size(segment,2) - 1) + segment(4,:);
+            temp = (tempa' * tempa);
+            wH = tempa' ./ temp;
+            %a_p = pinv(tempa);
+            source(k) = wH * tempseg;            
+        end
+
+        ifft_source = ifft(source);
+        ifft_source = ifft_source(1:size(window_length));
+
+        new_data(i:i+size(segment,2) - 1) = new_data(i:i+size(segment,2) - 1) + ifft_source;
+        %new_data(1, i:i+size(segment,2) - 1) = new_data(1, i:i+size(segment,2) - 1) + segment(1,:);
+        %new_data(2, i:i+size(segment,2) - 1) = new_data(2, i:i+size(segment,2) - 1) + segment(2,:);
+        %new_data(3, i:i+size(segment,2) - 1) = new_data(3, i:i+size(segment,2) - 1) + segment(3,:);
+        %new_data(4, i:i+size(segment,2) - 1) = new_data(4, i:i+size(segment,2) - 1) + segment(4,:);
 
         disp(i);
 end
 
 f1 = figure;
-plot(test1(1, 1:6000));
+plot(new_data(1, 1:10000));
 
-f2 = figure;
-plot(test2(1, 1:6000));
 
