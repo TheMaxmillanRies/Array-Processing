@@ -74,6 +74,37 @@ end
 das_data = zeros(1, size(microphone_data,2)); % x
 mvdr_data = zeros(1, size(microphone_data,2)); % x
 mcw_data = zeros(1, size(microphone_data,2)); % x
+Rn = zeros(M,M,nfft);
+
+% Estimate Rn
+noise_only_len = 0.5 * fs;
+for i = 1:hop_size:noise_only_len+1
+        segment = [];
+        if i + window_length*2 > size(microphone_data,2)
+              continue;
+        else
+            segment = zeros(4, window_length);
+            segment(1,1:window_length) = microphone_data(1,i:i+window_length - 1);
+            segment(2,1:window_length) = microphone_data(2,i:i+window_length - 1);
+            segment(3,1:window_length) = microphone_data(3,i:i+window_length - 1);
+            segment(4,1:window_length) = microphone_data(4,i:i+window_length - 1);
+        end
+
+        segment(1,:) = segment(1,:) .* window;
+        segment(2,:) = segment(2,:) .* window;
+        segment(3,:) = segment(3,:) .* window;
+        segment(4,:) = segment(4,:) .* window;
+
+        fft_seg = zeros(M, nfft);
+        for j = 1:M
+            fft_seg(j,:) = fft(segment(j,:), nfft);
+        end 
+
+        for k = 1:size(fft_seg,2)
+            Rn(:,:,k) = Rn(:,:,k) + fft_seg(:,k) * fft_seg(:,k)' ./ M;
+        end
+end
+Rn = Rn / (noise_only_len/hop_size);
 
 for i = 1:hop_size:size(microphone_data,2)
     segment = [];
@@ -98,12 +129,12 @@ for i = 1:hop_size:size(microphone_data,2)
     end
 
     % Estimate Rn
-    if i == 1 % first 25ms as noise-only segment
-        Rn = zeros(M,M,nfft);
-        for k = 1:size(fft_seg,2)
-            Rn(:,:,k) = fft_seg(:,k) * fft_seg(:,k)' ./ M + eps*eye(M);
-        end
-    end
+%     if i <= 8001 % first 0.5s as noise-only segment
+%         Rn = zeros(M,M,nfft);
+%         for k = 1:size(fft_seg,2)
+%             Rn(:,:,k) = fft_seg(:,k) * fft_seg(:,k)' ./ M + eps*eye(M);
+%         end
+%     end
 
     source_das = zeros(1, window_length);
     source_mvdr = zeros(1, window_length);
@@ -114,7 +145,7 @@ for i = 1:hop_size:size(microphone_data,2)
         % Estimate ATF and Rs
         Rx = fft_seg(:,k) * fft_seg(:,k)' ./ M +  eps*eye(M);
         %         [V,D] = eig(Rx,Rn(:,:,k));
-        [V,D] = eig(Rn(:,:,k)\Rx - eye(M));
+        [V,D] = eig(Rn(:,:,k)\Rx);
         %         if find(isinf(D)) ~= 0
         %             Rn(:,:,k) = Rn(:,:,k) + 1.00e-10;
         %             [V,D] = eig(Rx,Rn(:,:,k));
@@ -125,7 +156,7 @@ for i = 1:hop_size:size(microphone_data,2)
         Q = Vs^(-1)';
         a_est(:,k) = Q(:,1);
         D1 = Ds(1:r,1:r);
-        sigma_s = D1 + 1;
+        sigma_s = D1 - 1;
 
         % Delay & Sum Beamformer
         temp = (a_est(:,k)' * a_est(:,k));
