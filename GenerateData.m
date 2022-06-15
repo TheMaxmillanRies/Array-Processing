@@ -1,67 +1,88 @@
-[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
+close all;
 
-Singular = svd(X);
+[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
 
 %plot(Singular,'*r')
 
-theta = esprit(X, 2);
+%theta = esprit(X, 2);
 
-f = espritfreq(X, 2);
+%f = espritfreq(X, 2);
 
-%theta, f = joint(X, 2, 10);
+%[theta, f] = joint(X, 2, 10);
 
 esp_theta = zeros(2, 6);
 esp_f = zeros(2, 6);
-% Add joint
+jt_theta = zeros(2, 6);
+jt_f = zeros(2, 6);
 
 for snr = 0:4:20
     esprit_theta = zeros(2, 1000);
     esprit_f = zeros(2, 1000);
-    joint_arr = zeros(2, 1000);
+    joint_theta = zeros(2, 1000);
+    joint_f = zeros(2,1000);
 
     for i = 1:1000
         [X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], snr);
+        
         theta = esprit(X, 2);
-        if theta(1) < 0
-            esprit_theta(1,i) = theta(1);
-            esprit_theta(2,i) = theta(2);
-        else
-            esprit_theta(1,i) = theta(2);
-            esprit_theta(2,i) = theta(1);
-        end
-
+        theta = sort(theta);
+        esprit_theta(1,i) = theta(1);
+        esprit_theta(2,i) = theta(2);
 
         f = espritfreq(X, 2);
+        f = sort(f);
         esprit_f(1,i) = f(1);
         esprit_f(2,i) = f(2);
 
-        % Add joint output
+        [theta, f] = joint(X, 2, 10);
+        theta = sort(theta);
+        f = sort(f);
+        joint_theta(1,i) = theta(1);
+        joint_theta(2,i) = theta(2);
+        
+        joint_f(1,i) = f(1);
+        joint_f(2,i) = f(2);
 
     end
     
 
     esp_theta(:,snr/4+1) = mean(esprit_theta, 2); % TODO: fix sign on the values
     esp_f(:,snr/4+1) = mean(esprit_f, 2);
-    % Add joint mean
+    jt_theta(:,snr/4+1) = mean(joint_theta, 2);
+    jt_f(:,snr/4+1) = mean(joint_f, 2);
        
 end
 
-f1 = figure;
+f1 = figure('Name','ESPRIT THETA');
 hold on
 plot((0:4:20), esp_theta(1,:),'r.');
 plot((0:4:20), esp_theta(2,:),'ro');
 % Add joint
 hold off
 
-f2 = figure;
+f2 = figure('Name','ESPRIT F');
 hold on
 plot((0:4:20), esp_f(1,:),'g.');
 plot((0:4:20), esp_f(2,:),'go');
 % Add joint
 hold off
 
-[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
-[S_f, w_H_f] = zero_forcing_freq(X, f);
+f3 = figure('Name','JOINT THETA');
+hold on
+plot((0:4:20), jt_theta(1,:),'g.');
+plot((0:4:20), jt_theta(2,:),'go');
+% Add joint
+hold off
+
+f4 = figure('Name','JOINT F');
+hold on
+plot((0:4:20), jt_f(1,:),'g.');
+plot((0:4:20), jt_f(2,:),'go');
+% Add joint
+hold off
+
+%[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
+%[S_f, w_H_f] = zero_forcing_freq(X, f);
 
 %plot_spatial_response_f(w_H_theta, 0.5); %TODO: Add magnitude
 
@@ -162,8 +183,6 @@ function f = espritfreq(X, d)
     end
 end
 
-% Joint works but, but I calculate freq and angle separately, normally stop
-% at the pseudoinverse multiplication and do the joint solver.
 function [theta, f] = joint(X, d, m)
     N = size(X, 2);
     
@@ -193,11 +212,11 @@ function [theta, f] = joint(X, d, m)
     pUx = pinv(Ux);
     pUxUy_theta = pUx * Uy;
     
-    %[Vectors,Values] = eig(pUxUy);
-    %theta = zeros(size(Values,1),1);
-    %for i = 1:size(Values,1)
-    %    theta(i) = 180/pi*asin(angle(Values(i,i))/pi);
-    %end
+%     [Vectors,Values] = eig(pUxUy_theta);
+%     theta = zeros(size(Values,1),1);
+%     for i = 1:size(Values,1)
+%         theta(i) = -180/pi*asin(angle(Values(i,i))/pi);
+%     end
     
     deltaX = transpose(kron([eye(m) zeros(m,1)], eye(size(X,1))));
     deltaY = transpose(kron([zeros(m,1) eye(m)], eye(size(X,1))));
@@ -208,15 +227,28 @@ function [theta, f] = joint(X, d, m)
     pUx = pinv(Ux);
     pUxUy_f = pUx * Uy;
 
-    MM = zeros(2,2,2);
-    MM(:,:,1) = pUxUy_theta;
-    MM(:,:,2) = pUxUy_f;
-    [A,LL,Cost] = acdc(MM);
+    % Solving Joint Diagonalization
+    M = [pUxUy_theta pUxUy_f];
+    [V,D] =  joint_diag(M,1e-8);
+    
+    D1 = D(:,1:d);
+    D2 = D(:,d+1:2*d);
 
-%     [Vectors,Values] = eig(pUxUy);
+    theta_tmp=diag(D1);
+    theta = -asin(angle(theta_tmp)./(pi))*180/pi;
+
+    phi = diag(D2);
+    f=-angle(phi)/(2*pi);
+
+
+    [theta, index] = sort(theta);
+
+    f = f(index);
+
+%     [Vectors,Values] = eig(pUxUy_f);
 %     f = zeros(size(Values,1),1);
 %     for i = 1:size(Values,1)
-%         f(i) = angle(Values(i,i)) / (2*pi);
+%         f(i) = -angle(Values(i,i)) / (2*pi);
 %     end
 end
 

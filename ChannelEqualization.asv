@@ -5,23 +5,20 @@ for i = 1:500
     s(i) = temp;
 end
 
-%s(1) = 0 + 1i * 0;
+s(1) = 0 + 1i * 0;
 
-[X, H] = gendata_conv(s, 4, 500, 0.5);
+[X, H] = gendata_conv(s, 4, 500, 0);
 %X2 = gendata_conv2(s, 4, 500, 0);
 
 % Zero Forcing Receiver
-wH_ZF = pinv(H);
-wH_ZF = wH_ZF(1,:);
-ZF_S = wH_ZF * X;
+wH = pinv(H);
+wH = wH(1,:);
+temp = wH * X;
 
 % Wiener Receiver
 E = (1/size(X,1))*(X * X');
 Rx = sum(E, 'all');
-Rxs = H;
-w_W = H / Rx;
-wH_W = w_W';
-W_S = wH_ZF * X;
+Rxs = sum((1/size(X,1))*(X * X'), 'all');
 
 
 function [X, H_c] = gendata_conv(s, P, N, sigma)
