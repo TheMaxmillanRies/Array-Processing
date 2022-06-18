@@ -1,6 +1,6 @@
 close all;
 
-[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.3], 20);
+[X, A, S] = gendata(5, 20, 0.5, [20, 30], [0.20, 0.3], 20);
 
 %plot(Singular,'*r')
 
@@ -9,6 +9,13 @@ close all;
 %f = espritfreq(X, 2);
 
 %[theta, f] = joint(X, 2, 10);
+
+%[U,S,V] = svd(X,"econ");
+%plot(diag(S), 'o');
+
+
+
+
 
 esp_theta = zeros(2, 6);
 esp_f = zeros(2, 6);
@@ -53,38 +60,45 @@ for snr = 0:4:20
        
 end
 
-f1 = figure('Name','ESPRIT THETA');
-hold on
-plot((0:4:20), esp_theta(1,:),'r.');
-plot((0:4:20), esp_theta(2,:),'ro');
-% Add joint
-hold off
+% f1 = figure('Name','ESPRIT THETA');
+% hold on
+% plot((0:4:20), esp_theta(1,:),'r.');
+% plot((0:4:20), esp_theta(2,:),'ro');
+% % Add joint
+% hold off
+% 
+% f2 = figure('Name','ESPRIT F');
+% hold on
+% plot((0:4:20), esp_f(1,:),'g.');
+% plot((0:4:20), esp_f(2,:),'go');
+% % Add joint
+% hold off
+% 
+% f3 = figure('Name','JOINT THETA');
+% hold on
+% plot((0:4:20), jt_theta(1,:),'g.');
+% plot((0:4:20), jt_theta(2,:),'go');
+% % Add joint
+% hold off
+% 
+% f4 = figure('Name','JOINT F');
+% hold on
+% plot((0:4:20), jt_f(1,:),'g.');
+% plot((0:4:20), jt_f(2,:),'go');
+% % Add joint
+% hold off
 
-f2 = figure('Name','ESPRIT F');
-hold on
-plot((0:4:20), esp_f(1,:),'g.');
-plot((0:4:20), esp_f(2,:),'go');
-% Add joint
-hold off
+[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], 10);
 
-f3 = figure('Name','JOINT THETA');
-hold on
-plot((0:4:20), jt_theta(1,:),'g.');
-plot((0:4:20), jt_theta(2,:),'go');
-% Add joint
-hold off
+theta = esprit(X, 2);
+f = espritfreq(X, 2);
 
-f4 = figure('Name','JOINT F');
-hold on
-plot((0:4:20), jt_f(1,:),'g.');
-plot((0:4:20), jt_f(2,:),'go');
-% Add joint
-hold off
+[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
+[S_f, w_H_f] = zero_forcing_freq(X, f);
 
-%[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
-%[S_f, w_H_f] = zero_forcing_freq(X, f);
+plot_spatial_response_theta(w_H_theta, 0.5); %TODO: Add magnitude
 
-%plot_spatial_response_f(w_H_theta, 0.5); %TODO: Add magnitude
+plot_spatial_response_f(w_H_f, 0.5); %TODO: Add magnitude
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
@@ -310,15 +324,15 @@ function spatial_responses = plot_spatial_response_theta(w_H, Delta)
             end
         end
         temp = w_H * A;
-        y(1,angle+91) = temp(1,1);
-        y(2,angle+91) = temp(2,1);
+        y(1,angle+91) = abs(temp(1,1));
+        y(2,angle+91) = abs(temp(2,1));
     end
 
     x_axis = (-90:90);
-    f1 = figure;
+    f3 = figure;
     plot(x_axis, y(1,:));
 
-    f2 = figure;
+    f4 = figure;
     plot(x_axis, y(2,:));
 end
 
@@ -336,15 +350,15 @@ function spatial_responses = plot_spatial_response_f(w_H, Delta)
             end
         end
         temp = w_H * A;
-        y(1,angle+91) = temp(1,1);
-        y(2,angle+91) = temp(2,1);
+        y(1,angle+91) = abs(temp(1,1));
+        y(2,angle+91) = abs(temp(2,1));
     end
 
     x_axis = (-90:90);
-    f1 = figure;
+    f7 = figure;
     plot(x_axis, y(1,:));
 
-    f2 = figure;
+    f8 = figure;
     plot(x_axis, y(2,:));
 end
 
