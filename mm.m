@@ -18,35 +18,21 @@ babble = babble(1:speech_size,1)';
 artif_nonstat = artif_nonstat';
 speech_shaped = speech_shaped(1:speech_size,1)';
 
-%%
+%% Microphone data array
 target = conv(clean_1, impulse_responses.h_target(1,:), 'same');
-% Microphone data array
 microphone_data = zeros(4, speech_size);
 
-% Add clean_2 data
-for i = 1:size(microphone_data,1)
+% Add noise
+for i = 1:M
     microphone_data(i,:) = microphone_data(i,:) + conv(clean_2, impulse_responses.h_inter1(i,:), 'same');
-end
-
-% Add babble data
-for i = 1:size(microphone_data,1)
     microphone_data(i,:) = microphone_data(i,:) + conv(babble, impulse_responses.h_inter2(i,:), 'same');
-end
-
-% Add artif_nonstat data
-for i = 1:size(microphone_data,1)
     microphone_data(i,:) = microphone_data(i,:) + conv(artif_nonstat, impulse_responses.h_inter3(i,:), 'same');
-end
-
-% Add artif_nonstat data
-for i = 1:size(microphone_data,1)
     microphone_data(i,:) = microphone_data(i,:) + conv(speech_shaped, impulse_responses.h_inter4(i,:), 'same');
 end
-
 noise_orig = microphone_data;
 
 % Add clean_1 data
-for i = 1:size(microphone_data,1)
+for i = 1:M
     microphone_data(i,:) = microphone_data(i,:) + conv(clean_1, impulse_responses.h_target(i,:), 'same');
 end
 
@@ -79,39 +65,11 @@ Rn = zeros(M,M,nfft);
 % Estimate Rn
 noise_only_len = 0.5 * fs;
 for i = 1:hop_size:noise_only_len+1
-        segment = [];
-        if i + window_length*2 > size(microphone_data,2)
-              continue;
-        else
-            segment = zeros(4, window_length);
-            segment(1,1:window_length) = microphone_data(1,i:i+window_length - 1);
-            segment(2,1:window_length) = microphone_data(2,i:i+window_length - 1);
-            segment(3,1:window_length) = microphone_data(3,i:i+window_length - 1);
-            segment(4,1:window_length) = microphone_data(4,i:i+window_length - 1);
-        end
-
-        segment(1,:) = segment(1,:) .* window;
-        segment(2,:) = segment(2,:) .* window;
-        segment(3,:) = segment(3,:) .* window;
-        segment(4,:) = segment(4,:) .* window;
-
-        fft_seg = zeros(M, nfft);
-        for j = 1:M
-            fft_seg(j,:) = fft(segment(j,:), nfft);
-        end 
-
-        for k = 1:size(fft_seg,2)
-            Rn(:,:,k) = Rn(:,:,k) + fft_seg(:,k) * fft_seg(:,k)' ./ M;
-        end
-end
-Rn = Rn / (noise_only_len/hop_size);
-
-for i = 1:hop_size:size(microphone_data,2)
     segment = [];
     if i + window_length*2 > size(microphone_data,2)
         continue;
     else
-        segment = zeros(4, window_length);
+        segment = zeros(M, window_length);
         segment(1,1:window_length) = microphone_data(1,i:i+window_length - 1);
         segment(2,1:window_length) = microphone_data(2,i:i+window_length - 1);
         segment(3,1:window_length) = microphone_data(3,i:i+window_length - 1);
@@ -128,13 +86,33 @@ for i = 1:hop_size:size(microphone_data,2)
         fft_seg(j,:) = fft(segment(j,:), nfft);
     end
 
-    % Estimate Rn
-%     if i <= 8001 % first 0.5s as noise-only segment
-%         Rn = zeros(M,M,nfft);
-%         for k = 1:size(fft_seg,2)
-%             Rn(:,:,k) = fft_seg(:,k) * fft_seg(:,k)' ./ M + eps*eye(M);
-%         end
-%     end
+    for k = 1:size(fft_seg,2)
+        Rn(:,:,k) = Rn(:,:,k) + fft_seg(:,k) * fft_seg(:,k)' ./ M;
+    end
+end
+% Rn = Rn / (noise_only_len/hop_size);
+
+for i = 1:hop_size:size(microphone_data,2)
+    segment = [];
+    if i + window_length*2 > size(microphone_data,2)
+        continue;
+    else
+        segment = zeros(M, window_length);
+        segment(1,1:window_length) = microphone_data(1,i:i+window_length - 1);
+        segment(2,1:window_length) = microphone_data(2,i:i+window_length - 1);
+        segment(3,1:window_length) = microphone_data(3,i:i+window_length - 1);
+        segment(4,1:window_length) = microphone_data(4,i:i+window_length - 1);
+    end
+
+    segment(1,:) = segment(1,:) .* window;
+    segment(2,:) = segment(2,:) .* window;
+    segment(3,:) = segment(3,:) .* window;
+    segment(4,:) = segment(4,:) .* window;
+
+    fft_seg = zeros(M, nfft);
+    for j = 1:M
+        fft_seg(j,:) = fft(segment(j,:), nfft);
+    end
 
     source_das = zeros(1, window_length);
     source_mvdr = zeros(1, window_length);
@@ -144,19 +122,15 @@ for i = 1:hop_size:size(microphone_data,2)
     for k = 1:size(fft_seg,2)
         % Estimate ATF and Rs
         Rx = fft_seg(:,k) * fft_seg(:,k)' ./ M +  eps*eye(M);
-        %         [V,D] = eig(Rx,Rn(:,:,k));
         [V,D] = eig(Rn(:,:,k)\Rx);
-        %         if find(isinf(D)) ~= 0
-        %             Rn(:,:,k) = Rn(:,:,k) + 1.00e-10;
-        %             [V,D] = eig(Rx,Rn(:,:,k));
-        %         end
         [d,ind] = sort(diag(D),'descend');
         Ds = D(ind,ind);
         Vs = V(:,ind);
         Q = Vs^(-1)';
         a_est(:,k) = Q(:,1);
-        D1 = Ds(1:r,1:r);
-        sigma_s = D1 - 1;
+        % Normalize a_est
+%         a_est(:,k) = a_est(:,k) ./ a_est(1,k);
+        sigma_s = d(1) - 1;
 
         % Delay & Sum Beamformer
         temp = (a_est(:,k)' * a_est(:,k));
@@ -165,11 +139,8 @@ for i = 1:hop_size:size(microphone_data,2)
 
         % MVDR Beamfomer
         temp1 = Rx \ a_est(:,k);
-%         temp2 = a_est(:,k)' * Rx^(-1) * a_est(:,k);
+        %         temp2 = a_est(:,k)' * Rx^(-1) * a_est(:,k);
         temp2 = a_est(:,k)' * temp1;
-
-        %             temp1 = Rn(:,:,k) \ aa(:,k);
-        %             temp2 = aa(:,k)' * Rn(:,:,k)^(-1) * aa(:,k);
 
         w_mvdr = temp1 ./ temp2;
         source_mvdr(k) = w_mvdr' * fft_seg(:,k);
@@ -178,14 +149,14 @@ for i = 1:hop_size:size(microphone_data,2)
         % = Single-Channel Wiener filter + MVDR
         w_scw = sigma_s^2 / (sigma_s^2 + temp2^(-1));
         w_mcw = w_scw * w_mvdr;
-%         w_mcw = sigma_s * temp1;
+        %         w_mcw = sigma_s * temp1;
         source_mcw(k) = w_mcw' * fft_seg(:,k);
-
+        
     end
 
-    ifft_source_das = real(ifft(source_das));
-    ifft_source_mvdr = real(ifft(source_mvdr));
-    ifft_source_mcw = real(ifft(source_mcw));
+    ifft_source_das = (ifft(source_das));
+    ifft_source_mvdr = (ifft(source_mvdr));
+    ifft_source_mcw = (ifft(source_mcw));
 
     das_data(i:i+size(ifft_source_das,2) - 1) = das_data(i:i+size(ifft_source_das,2) - 1) + ifft_source_das;
     mvdr_data(i:i+size(ifft_source_mvdr,2) - 1) = mvdr_data(i:i+size(ifft_source_mvdr,2) - 1) + ifft_source_mvdr;
@@ -195,20 +166,26 @@ for i = 1:hop_size:size(microphone_data,2)
 end
 
 % sound(das_new_data,fs)
-
+das_data = real(das_data);
+mvdr_data = real(mvdr_data);
+mcw_data = real(mcw_data);
 %% Evaluation
-
+stoi_before = stoi(target,microphone_data(1,:),fs);
+stoi_mvdr = stoi(target,mvdr_data,fs);
+stoi_mcw = stoi(target,mcw_data,fs);
 
 %% Plot
-t=(0:100000-1)/fs;
+len=500000;
+t=(0:len-1)/fs;
 figure(1)
 subplot(511);
-plot(t,target(1:100000));ylim([-0.04,0.04]);title('clean speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,target(1:len));title('clean speech');xlabel('t/s');ylabel('Amplitude');
 subplot(512);
-plot(t,microphone_data(1,1:100000));ylim([-0.04,0.04]);title('noisy speech (mic 1)');xlabel('t/s');ylabel('Amplitude');
+plot(t,microphone_data(1,1:len));title('noisy speech (mic 1)');xlabel('t/s');ylabel('Amplitude');
 subplot(513);
-plot(t,das_data(1:100000));ylim([-0.04,0.04]);title('Delay & Sum enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,das_data(1:len));title('Delay & Sum enhanced speech');xlabel('t/s');ylabel('Amplitude');
 subplot(514);
-plot(t,mvdr_data(1:100000));title('MVDR enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,mvdr_data(1:len));title('MVDR enhanced speech');xlabel('t/s');ylabel('Amplitude');
 subplot(515);
-plot(t,mcw_data(1:100000));title('Multi-Channel Wiener filter enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,mcw_data(1:len));title('Multi-Channel Wiener filter enhanced speech');xlabel('t/s');ylabel('Amplitude');
+
