@@ -1,4 +1,4 @@
-
+close all;
 temp = 1/sqrt(2) + 1i*1/sqrt(2);
 s = zeros(500, 1);
 for i = 1:500
@@ -18,7 +18,7 @@ end
 
 %s(1) = 0 + 1i * 0;
 
-[X, H] = gendata_conv(s, 8, 500, 0);
+[X, H] = gendata_conv(s, 4, 500, 0.5);
 %X2 = gendata_conv2(s, 4, 500, 0);
 
 % Zero Forcing Receiver

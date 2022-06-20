@@ -18,9 +18,13 @@ close all;
 
 
 esp_theta = zeros(2, 6);
+sd_theta = zeros(2, 6);
 esp_f = zeros(2, 6);
+sd_f = zeros(2, 6);
 jt_theta = zeros(2, 6);
+sd_jd_theta = zeros(2, 6);
 jt_f = zeros(2, 6);
+sd_jd_f = zeros(2, 6);
 
 for snr = 0:4:20
     esprit_theta = zeros(2, 1000);
@@ -53,52 +57,59 @@ for snr = 0:4:20
     end
     
 
-    esp_theta(:,snr/4+1) = mean(esprit_theta, 2); % TODO: fix sign on the values
+    esp_theta(:,snr/4+1) = mean(esprit_theta, 2);
+    sd_theta(:,snr/4+1) = std(esprit_theta, 0, 2);
+    
     esp_f(:,snr/4+1) = mean(esprit_f, 2);
+    sd_f(:,snr/4+1) = std(esprit_f, 0, 2);
+    
     jt_theta(:,snr/4+1) = mean(joint_theta, 2);
+    sd_jd_theta(:,snr/4+1) = std(joint_theta, 0, 2);
+    
     jt_f(:,snr/4+1) = mean(joint_f, 2);
+    sd_jd_f(:,snr/4+1) = std(joint_f, 0, 2);
        
 end
 
-% f1 = figure('Name','ESPRIT THETA');
-% hold on
-% plot((0:4:20), esp_theta(1,:),'r.');
-% plot((0:4:20), esp_theta(2,:),'ro');
-% % Add joint
-% hold off
+f1 = figure('Name','ESPRIT THETA');
+hold on
+plot((0:4:20), sd_theta(1,:),'r.');
+plot((0:4:20), sd_theta(2,:),'ro');
+% Add joint
+hold off
+
+f2 = figure('Name','ESPRIT F');
+hold on
+plot((0:4:20), sd_f(1,:),'g.');
+plot((0:4:20), sd_f(2,:),'go');
+% Add joint
+hold off
+
+f3 = figure('Name','JOINT THETA');
+hold on
+plot((0:4:20), sd_jd_theta(1,:),'g.');
+plot((0:4:20), sd_jd_theta(2,:),'go');
+% Add joint
+hold off
+
+f4 = figure('Name','JOINT F');
+hold on
+plot((0:4:20), sd_jd_f(1,:),'g.');
+plot((0:4:20), sd_jd_f(2,:),'go');
+% Add joint
+hold off
+
+% [X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], 10);
 % 
-% f2 = figure('Name','ESPRIT F');
-% hold on
-% plot((0:4:20), esp_f(1,:),'g.');
-% plot((0:4:20), esp_f(2,:),'go');
-% % Add joint
-% hold off
+% theta = esprit(X, 2);
+% f = espritfreq(X, 2);
 % 
-% f3 = figure('Name','JOINT THETA');
-% hold on
-% plot((0:4:20), jt_theta(1,:),'g.');
-% plot((0:4:20), jt_theta(2,:),'go');
-% % Add joint
-% hold off
+% [S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
+% [S_f, w_H_f] = zero_forcing_freq(X, f);
 % 
-% f4 = figure('Name','JOINT F');
-% hold on
-% plot((0:4:20), jt_f(1,:),'g.');
-% plot((0:4:20), jt_f(2,:),'go');
-% % Add joint
-% hold off
-
-[X, A, S] = gendata(3, 20, 0.5, [-20, 30], [0.1, 0.12], 10);
-
-theta = esprit(X, 2);
-f = espritfreq(X, 2);
-
-[S_theta, w_H_theta] = zero_forcing_theta(X, 0.5, theta);
-[S_f, w_H_f] = zero_forcing_freq(X, f);
-
-plot_spatial_response_theta(w_H_theta, 0.5); %TODO: Add magnitude
-
-plot_spatial_response_f(w_H_f, 0.5); %TODO: Add magnitude
+% plot_spatial_response_theta(w_H_theta, 0.5); %TODO: Add magnitude
+% 
+% plot_spatial_response_f(w_H_f, 0.5); %TODO: Add magnitude
 
 function [X, A, S] = gendata(M, N, Delta, theta, f, SNR)
     % Create empty matrix MxN -> ReceiverAntenna x SamplesMeasured
