@@ -10,17 +10,19 @@ clc; clear all
 impulse_responses = load("impulse_responses.mat");
 
 speech_size = size(clean_1,1);
+% speech_size = 50000;
 
 % Clip all files to match the target speech file
-clean_1 = clean_1';
-clean_2 = padarray(clean_2.', [0, speech_size - size(clean_2,1)], 0, 'post');
-babble = babble(1:speech_size,1)';
-artif_nonstat = artif_nonstat';
-speech_shaped = speech_shaped(1:speech_size,1)';
+clean_1 = SizeAlign(clean_1,speech_size);
+clean_2 = SizeAlign(clean_2,speech_size);
+babble = SizeAlign(babble,speech_size);
+artif_nonstat = SizeAlign(artif_nonstat,speech_size);
+speech_shaped = SizeAlign(speech_shaped,speech_size);
 
 %% Microphone data array
+M = 4;
 target = conv(clean_1, impulse_responses.h_target(1,:), 'same');
-microphone_data = zeros(4, speech_size);
+microphone_data = zeros(M, speech_size);
 
 % Add noise
 for i = 1:M
@@ -36,33 +38,19 @@ for i = 1:M
     microphone_data(i,:) = microphone_data(i,:) + conv(clean_1, impulse_responses.h_target(i,:), 'same');
 end
 
-%% Beamforming
-% Overlapp-add method
+%% Overlapp-add method
 r = 1;
-M = size(microphone_data,1);
 nfft = 800;
 window_length = 400;
-hop_size = window_length / 2;
-window = hamming(window_length).';
-
-% FFT of IR
-a = zeros(M,nfft);
-for j = 1:M
-    a(j,:) = fft(impulse_responses.h_target(j,:), 800);
-end
-
-norm = a(1,:);
-% Make relative IR
-for j = 1:M
-    a(j,:) = a(j,:) ./ norm;
-end
+hop_size = window_length / 8;
+window = hanning(window_length).';
 
 das_data = zeros(1, size(microphone_data,2)); % x
 mvdr_data = zeros(1, size(microphone_data,2)); % x
 mcw_data = zeros(1, size(microphone_data,2)); % x
 Rn = zeros(M,M,nfft);
 
-% Estimate Rn
+%% Estimate Rn
 noise_only_len = 0.5 * fs;
 for i = 1:hop_size:noise_only_len+1
     segment = [];
@@ -90,8 +78,10 @@ for i = 1:hop_size:noise_only_len+1
         Rn(:,:,k) = Rn(:,:,k) + fft_seg(:,k) * fft_seg(:,k)' ./ M;
     end
 end
-% Rn = Rn / (noise_only_len/hop_size);
+Rn = Rn / (noise_only_len/hop_size);
 
+%% Beamforming
+l=1;
 for i = 1:hop_size:size(microphone_data,2)
     segment = [];
     if i + window_length*2 > size(microphone_data,2)
@@ -103,7 +93,6 @@ for i = 1:hop_size:size(microphone_data,2)
         segment(3,1:window_length) = microphone_data(3,i:i+window_length - 1);
         segment(4,1:window_length) = microphone_data(4,i:i+window_length - 1);
     end
-
     segment(1,:) = segment(1,:) .* window;
     segment(2,:) = segment(2,:) .* window;
     segment(3,:) = segment(3,:) .* window;
@@ -122,36 +111,40 @@ for i = 1:hop_size:size(microphone_data,2)
     for k = 1:size(fft_seg,2)
         % Estimate ATF and Rs
         Rx = fft_seg(:,k) * fft_seg(:,k)' ./ M +  eps*eye(M);
-        [V,D] = eig(Rn(:,:,k)\Rx);
+        [V,D,Q_test] = eig(Rn(:,:,k)\Rx);
         [d,ind] = sort(diag(D),'descend');
         Ds = D(ind,ind);
         Vs = V(:,ind);
         Q = Vs^(-1)';
         a_est(:,k) = Q(:,1);
-        % Normalize a_est
-%         a_est(:,k) = a_est(:,k) ./ a_est(1,k);
-        sigma_s = d(1) - 1;
+        sigma_s2 = (d(1) - 1);
 
         % Delay & Sum Beamformer
         temp = (a_est(:,k)' * a_est(:,k));
         w_das = a_est(:,k) ./ temp;
         source_das(k) = w_das' * fft_seg(:,k);
+%         Rs_das = w_das'* Rx * w_das;
+%         snr_das(k,l) = (w_das'* Rs_das * w_das) / (w_das'* Rn(:,:,k) * w_das);
 
         % MVDR Beamfomer
-        temp1 = Rx \ a_est(:,k);
-        %         temp2 = a_est(:,k)' * Rx^(-1) * a_est(:,k);
+%         temp1 = Rx \ a_est(:,k);
+        temp1 = Rn(:,:,k) \ a_est(:,k);
         temp2 = a_est(:,k)' * temp1;
 
         w_mvdr = temp1 ./ temp2;
         source_mvdr(k) = w_mvdr' * fft_seg(:,k);
+%         Rs_mvdr = w_mvdr'* Rx * w_mvdr;
+%         snr_mvdr(k,l) = (w_mvdr'* Rs_mvdr * w_mvdr) / (w_mvdr'* Rn(:,:,k) * w_mvdr);
 
         % Multi-Channel Wiener filter
         % = Single-Channel Wiener filter + MVDR
-        w_scw = sigma_s^2 / (sigma_s^2 + temp2^(-1));
+        w_scw = sigma_s2 / (sigma_s2 + temp2^(-1));
         w_mcw = w_scw * w_mvdr;
-        %         w_mcw = sigma_s * temp1;
+%         w_mcw = sigma_s * Rx \ a_est(:,k);
         source_mcw(k) = w_mcw' * fft_seg(:,k);
-        
+%         Rs_mcw = w_mcw'* Rx * w_mcw;
+%         snr_mcw(k,l) = (w_mcw'* Rs_mcw * w_mcw) / (w_mcw'* Rn(:,:,k) * w_mcw);
+
     end
 
     ifft_source_das = (ifft(source_das));
@@ -163,29 +156,48 @@ for i = 1:hop_size:size(microphone_data,2)
     mcw_data(i:i+size(ifft_source_mcw,2) - 1) = mcw_data(i:i+size(ifft_source_mcw,2) - 1) + ifft_source_mcw;
 
     %     disp(i);
+    l = l+1;
 end
 
 % sound(das_new_data,fs)
 das_data = real(das_data);
 mvdr_data = real(mvdr_data);
 mcw_data = real(mcw_data);
+%% Write audio file
+% audiowrite('clean_mic1.wav',target,fs); % write noisy signal
+% audiowrite('noisy_mic1.wav',microphone_data(1,:),fs); % write noisy signal
+% audiowrite('das.wav',das_data,fs);
+% audiowrite('mvdr.wav',mvdr_data,fs); 
+% audiowrite('mcw.wav',mcw_data,fs); 
 %% Evaluation
+% STOI
 stoi_before = stoi(target,microphone_data(1,:),fs);
+stoi_das = stoi(target,das_data,fs);
 stoi_mvdr = stoi(target,mvdr_data,fs);
 stoi_mcw = stoi(target,mcw_data,fs);
 
+% PESQ
+addpath PESQ;
+pesq_before = pesq('clean_mic1.wav','noisy_mic1.wav');
+pesq_das = pesq('clean_mic1.wav','das.wav');
+pesq_mvdr = pesq('clean_mic1.wav','mvdr.wav');
+pesq_mcw = pesq('clean_mic1.wav','mcw.wav');
+
 %% Plot
-len=500000;
+len=speech_size;
 t=(0:len-1)/fs;
 figure(1)
 subplot(511);
-plot(t,target(1:len));title('clean speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,target(1:len));xlim([0,max(t)]);title('clean speech (mic 1)');xlabel('t/s');ylabel('Amplitude');
 subplot(512);
-plot(t,microphone_data(1,1:len));title('noisy speech (mic 1)');xlabel('t/s');ylabel('Amplitude');
+plot(t,microphone_data(1,1:len));xlim([0,max(t)]);title('noisy speech (mic 1)');xlabel('t/s');ylabel('Amplitude');
 subplot(513);
-plot(t,das_data(1:len));title('Delay & Sum enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,das_data(1:len));xlim([0,max(t)]);title('Delay & Sum enhanced speech');xlabel('t/s');ylabel('Amplitude');
 subplot(514);
-plot(t,mvdr_data(1:len));title('MVDR enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,mvdr_data(1:len));xlim([0,max(t)]);title('MVDR enhanced speech');xlabel('t/s');ylabel('Amplitude');
 subplot(515);
-plot(t,mcw_data(1:len));title('Multi-Channel Wiener filter enhanced speech');xlabel('t/s');ylabel('Amplitude');
+plot(t,mcw_data(1:len));xlim([0,max(t)]);title('Multi-Channel Wiener filter enhanced speech');xlabel('t/s');ylabel('Amplitude');
 
+%%
+figure
+plot(t,mcw_data(1:len));xlim([0,max(t)]);title('Multi-Channel Wiener filter enhanced speech');xlabel('t/s');ylabel('Amplitude');
